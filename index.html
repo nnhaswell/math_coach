@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Math Coach | Build Core Arithmetic Skills</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="script.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="branding">
+        <span class="logo">Math Coach</span>
+        <p>Step-by-step practice for long division, multiplication, addition, and subtraction.</p>
+      </div>
+      <div class="session-meta">
+        <div id="timer" class="meta-card">
+          <span class="label">Time</span>
+          <span class="value">00:00</span>
+        </div>
+        <div id="score" class="meta-card">
+          <span class="label">Score</span>
+          <span class="value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="topic-panel">
+        <h2>Pick a strand</h2>
+        <div id="topic-list" class="topic-list"></div>
+      </aside>
+
+      <section class="content-panel">
+        <div id="topic-intro" class="card hidden">
+          <h2 id="topic-title"></h2>
+          <p id="topic-description"></p>
+          <div class="example-block">
+            <h3>Worked example</h3>
+            <p id="example-problem" class="example-problem"></p>
+            <ol id="example-steps" class="example-steps"></ol>
+            <p id="example-answer" class="example-answer"></p>
+          </div>
+          <button id="start-practice" class="primary">Start 5-question practice</button>
+        </div>
+
+        <div id="practice-area" class="card hidden">
+          <div class="status-bar">
+            <div><strong>Question</strong> <span id="question-count">1 / 5</span></div>
+            <div><strong>Hints used</strong> <span id="hint-count">0</span></div>
+          </div>
+
+          <div class="question-block">
+            <div id="question-text" class="question-text"></div>
+            <label id="answer-field" class="response-field">
+              <span id="answer-instruction"></span>
+              <input id="answer-input" autocomplete="off" />
+            </label>
+            <div class="action-row">
+              <button id="check-answer" class="primary">Check answer</button>
+              <button id="next-question" class="secondary hidden">Next question</button>
+              <button id="hint-button" class="ghost">Show hint</button>
+            </div>
+            <p id="feedback" class="feedback"></p>
+          </div>
+
+          <div class="utility-row">
+            <div class="hints">
+              <h4>Hints</h4>
+              <ol id="hint-list" class="hint-list"></ol>
+            </div>
+
+            <div class="note-area">
+              <label for="note-input">Scratchpad</label>
+              <textarea
+                id="note-input"
+                rows="4"
+                placeholder="Jot down regrouping, partial products, or other working notes here."
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div id="times-table-area" class="card hidden">
+          <div id="times-table-setup">
+            <h2>Times Table Star</h2>
+            <p>Race the clock for one minute to answer as many facts as you can.</p>
+            <form id="times-table-form" class="times-table-form">
+              <fieldset>
+                <legend>Choose a challenge</legend>
+                <label class="radio-option">
+                  <input type="radio" name="tts-mode" value="single" checked />
+                  <span>
+                    <strong>Single times table</strong>
+                    <small>Focus on one multiplication table you select.</small>
+                  </span>
+                </label>
+                <div class="table-select">
+                  <label for="tts-table">Times table</label>
+                  <select id="tts-table">
+                    <option value="2">×2</option>
+                    <option value="3">×3</option>
+                    <option value="4">×4</option>
+                    <option value="5">×5</option>
+                    <option value="6">×6</option>
+                    <option value="7">×7</option>
+                    <option value="8">×8</option>
+                    <option value="9">×9</option>
+                    <option value="10">×10</option>
+                    <option value="11">×11</option>
+                    <option value="12">×12</option>
+                  </select>
+                </div>
+                <label class="radio-option">
+                  <input type="radio" name="tts-mode" value="mixed" />
+                  <span>
+                    <strong>Mixed multiplication</strong>
+                    <small>Random facts from ×2 through ×12.</small>
+                  </span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="tts-mode" value="mixed-div" />
+                  <span>
+                    <strong>Multiplication & division mix</strong>
+                    <small>Switch between multiplication and related division facts.</small>
+                  </span>
+                </label>
+              </fieldset>
+              <button id="times-table-start" class="primary">Start 60-second challenge</button>
+            </form>
+          </div>
+
+          <div id="times-table-session" class="times-table-session hidden">
+            <div class="times-table-status">
+              <div class="status-pill">
+                <span>Time left</span>
+                <strong id="times-table-timer">01:00</strong>
+              </div>
+              <div class="status-pill">
+                <span>Solved</span>
+                <strong id="times-table-correct">0</strong>
+              </div>
+              <div class="status-pill">
+                <span>Attempted</span>
+                <strong id="times-table-attempted">0</strong>
+              </div>
+            </div>
+            <p id="times-table-question" class="times-table-question"></p>
+            <div class="times-table-answer">
+              <label for="times-table-input" class="sr-only">Enter your answer</label>
+              <input id="times-table-input" autocomplete="off" inputmode="numeric" />
+              <div class="times-table-actions">
+                <button id="times-table-submit" class="primary">Submit</button>
+                <button id="times-table-end" class="ghost" type="button">End early</button>
+              </div>
+            </div>
+            <p id="times-table-feedback" class="feedback"></p>
+          </div>
+
+          <div id="times-table-summary" class="times-table-summary hidden">
+            <h3>Challenge complete!</h3>
+            <div class="summary-grid">
+              <div>
+                <span class="label">Total solved</span>
+                <strong id="times-table-solved">0</strong>
+              </div>
+              <div>
+                <span class="label">Attempted</span>
+                <strong id="times-table-total">0</strong>
+              </div>
+              <div>
+                <span class="label">Accuracy</span>
+                <strong id="times-table-accuracy">0%</strong>
+              </div>
+            </div>
+            <p id="times-table-summary-message"></p>
+            <div class="times-table-summary-actions">
+              <button id="times-table-restart" class="primary">Run it again</button>
+              <button id="times-table-back" class="secondary">Back to topics</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="session-summary" class="card hidden">
+          <h2>Great effort!</h2>
+          <p id="summary-message"></p>
+          <div class="summary-stats">
+            <div><strong>Total time:</strong> <span id="summary-time">0s</span></div>
+            <div><strong>Hints used:</strong> <span id="summary-hints">0</span></div>
+            <div><strong>Final score:</strong> <span id="summary-score">0</span></div>
+          </div>
+          <button id="restart-topic" class="primary">Try again</button>
+          <button id="back-to-topics" class="secondary">Choose another topic</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>Practice tips: take your time, use hints only when needed, and track your improvement session by session.</p>
+    </footer>
+  </body>
+</html>
