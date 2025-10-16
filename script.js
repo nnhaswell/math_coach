@@ -839,7 +839,31 @@ const dom = {
   summaryHints: document.getElementById("summary-hints"),
   summaryScore: document.getElementById("summary-score"),
   restartTopic: document.getElementById("restart-topic"),
-  backToTopics: document.getElementById("back-to-topics")
+  backToTopics: document.getElementById("back-to-topics"),
+  timesTableArea: document.getElementById("times-table-area"),
+  timesTableSetup: document.getElementById("times-table-setup"),
+  timesTableForm: document.getElementById("times-table-form"),
+  timesTableModeRadios: document.querySelectorAll('input[name="tts-mode"]'),
+  timesTableTableWrapper: document.querySelector(".table-select"),
+  timesTableTableSelect: document.getElementById("tts-table"),
+  timesTableStart: document.getElementById("times-table-start"),
+  timesTableSession: document.getElementById("times-table-session"),
+  timesTableTimer: document.getElementById("times-table-timer"),
+  timesTableCorrect: document.getElementById("times-table-correct"),
+  timesTableAttempted: document.getElementById("times-table-attempted"),
+  timesTableQuestion: document.getElementById("times-table-question"),
+  timesTableInput: document.getElementById("times-table-input"),
+  timesTableSubmit: document.getElementById("times-table-submit"),
+  timesTableEnd: document.getElementById("times-table-end"),
+  timesTableFeedback: document.getElementById("times-table-feedback"),
+  timesTableSummary: document.getElementById("times-table-summary"),
+  timesTableSolved: document.getElementById("times-table-solved"),
+  timesTableTotal: document.getElementById("times-table-total"),
+  timesTableAccuracy: document.getElementById("times-table-accuracy"),
+  timesTableSummaryMessage: document.getElementById("times-table-summary-message"),
+  timesTableRestart: document.getElementById("times-table-restart"),
+  timesTableBack: document.getElementById("times-table-back"),
+  timesTableKeypad: document.getElementById("times-table-keypad")
 };
 
 const state = {
@@ -852,12 +876,24 @@ const state = {
   sessionStart: null,
   questionStart: null,
   timerInterval: null,
-  awaitingNext: false
+  awaitingNext: false,
+  mode: "idle",
+  timesTable: {
+    active: false,
+    challengeMode: "single",
+    selectedTable: 2,
+    timeRemaining: 60,
+    timerInterval: null,
+    totalAttempted: 0,
+    correct: 0,
+    currentQuestion: null
+  }
 };
 
 function init() {
   renderTopics();
   attachEvents();
+  configureTimesTable();
 }
 
 function attachEvents() {
@@ -877,29 +913,158 @@ function attachEvents() {
   });
 }
 
+function configureTimesTable() {
+  if (!dom.timesTableForm) return;
+
+  dom.timesTableForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    startTimesTableChallenge();
+  });
+
+  dom.timesTableModeRadios.forEach((radio) => {
+    radio.addEventListener("change", updateTimesTableModeUI);
+  });
+
+  dom.timesTableSubmit.addEventListener("click", (event) => {
+    event.preventDefault();
+    submitTimesTableAnswer();
+  });
+
+  dom.timesTableInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitTimesTableAnswer();
+    }
+  });
+
+  dom.timesTableEnd.addEventListener("click", () => {
+    finishTimesTableChallenge("manual");
+  });
+
+  dom.timesTableRestart.addEventListener("click", () => {
+    showTimesTableSetup();
+  });
+
+  dom.timesTableBack.addEventListener("click", () => {
+    resetTimesTableState();
+    clearActiveTopic();
+    dom.timesTableArea.classList.add("hidden");
+  });
+
+  if (dom.timesTableKeypad) {
+    dom.timesTableKeypad.addEventListener("click", handleTimesTableKeypadClick);
+  }
+
+  updateTimesTableModeUI();
+}
+
 function renderTopics() {
   dom.topicList.innerHTML = "";
+  const groups = new Map();
   topics.forEach((topic) => {
-    const card = document.createElement("button");
-    card.className = "topic-card";
-    card.type = "button";
-    card.dataset.topic = topic.id;
-
-    const heading = document.createElement("h3");
-    heading.textContent = `${topic.strand} — ${topic.title}`;
-    const desc = document.createElement("p");
-    desc.textContent = topic.description;
-
-    card.appendChild(heading);
-    card.appendChild(desc);
-    card.addEventListener("click", () => selectTopic(topic.id));
-    dom.topicList.appendChild(card);
+    if (!groups.has(topic.strand)) {
+      groups.set(topic.strand, []);
+    }
+    groups.get(topic.strand).push(topic);
   });
+
+  Array.from(groups.entries()).forEach(([strand, strandTopics], index) => {
+    const group = document.createElement("div");
+    group.className = "strand-group";
+    if (strand === "Addition" || index === 0) {
+      group.classList.add("open");
+    }
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "strand-toggle";
+    toggle.innerHTML = `<span>${strand}</span><span class="chevron">›</span>`;
+
+    const body = document.createElement("div");
+    body.className = "strand-body";
+
+    toggle.addEventListener("click", () => {
+      const open = !group.classList.contains("open");
+      setStrandOpen(group, body, open);
+    });
+
+    strandTopics.forEach((topic) => {
+      const card = document.createElement("button");
+      card.className = "topic-card";
+      card.type = "button";
+      card.dataset.topic = topic.id;
+
+      const heading = document.createElement("h3");
+      heading.textContent = topic.title;
+      const desc = document.createElement("p");
+      desc.textContent = topic.description;
+
+      card.appendChild(heading);
+      card.appendChild(desc);
+      card.addEventListener("click", () => {
+        ensureGroupOpen(group, body);
+        selectTopic(topic.id);
+      });
+      body.appendChild(card);
+    });
+
+    group.appendChild(toggle);
+    group.appendChild(body);
+    dom.topicList.appendChild(group);
+
+    setStrandOpen(group, body, group.classList.contains("open"));
+  });
+
+  addTimesTableCard();
+}
+
+function setStrandOpen(group, body, open) {
+  if (open) {
+    group.classList.add("open");
+    body.style.maxHeight = `${body.scrollHeight + 16}px`;
+    body.style.opacity = "1";
+    body.style.transform = "translateY(0)";
+  } else {
+    group.classList.remove("open");
+    body.style.maxHeight = "0";
+    body.style.opacity = "0";
+    body.style.transform = "translateY(-8px)";
+  }
+}
+
+function ensureGroupOpen(group, body) {
+  if (!group.classList.contains("open")) {
+    setStrandOpen(group, body, true);
+  }
+}
+
+function addTimesTableCard() {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "topic-card special";
+  card.dataset.special = "times-table";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Times Table Star";
+  const desc = document.createElement("p");
+  desc.textContent = "Minute-long multiplication practice with optional division mix.";
+
+  card.appendChild(heading);
+  card.appendChild(desc);
+  card.addEventListener("click", () => selectTimesTable(card));
+
+  dom.topicList.appendChild(card);
+  dom.timesTableCard = card;
 }
 
 function selectTopic(topicId) {
   const topic = topics.find((item) => item.id === topicId);
   if (!topic) return;
+
+  resetTimesTableState();
+  if (dom.timesTableArea) {
+    dom.timesTableArea.classList.add("hidden");
+  }
 
   state.currentTopic = topic;
   clearActiveTopic();
@@ -909,6 +1074,7 @@ function selectTopic(topicId) {
   }
 
   resetSessionState();
+  state.mode = "practice";
   populateTopicIntro(topic);
 
   dom.topicIntro.classList.remove("hidden");
@@ -920,6 +1086,9 @@ function clearActiveTopic() {
   document
     .querySelectorAll(".topic-card.active")
     .forEach((card) => card.classList.remove("active"));
+  if (dom.timesTableCard) {
+    dom.timesTableCard.classList.remove("active");
+  }
 }
 
 function populateTopicIntro(topic) {
@@ -938,6 +1107,7 @@ function populateTopicIntro(topic) {
 function startPractice() {
   if (!state.currentTopic) return;
 
+  state.mode = "practice";
   state.questionIndex = 0;
   state.score = 0;
   state.totalHintsUsed = 0;
@@ -1153,6 +1323,297 @@ function revealHint() {
   dom.hintCount.textContent = `${state.totalHintsUsed}`;
 }
 
+function selectTimesTable(card) {
+  resetSessionState();
+  resetTimesTableState();
+  clearActiveTopic();
+
+  if (card) {
+    card.classList.add("active");
+  }
+
+  state.currentTopic = null;
+  state.mode = "timesTable";
+
+  if (dom.topicIntro) dom.topicIntro.classList.add("hidden");
+  if (dom.practiceArea) dom.practiceArea.classList.add("hidden");
+  if (dom.sessionSummary) dom.sessionSummary.classList.add("hidden");
+  if (dom.timesTableArea) dom.timesTableArea.classList.remove("hidden");
+
+  showTimesTableSetup();
+}
+
+function updateTimesTableModeUI() {
+  if (!dom.timesTableModeRadios) return;
+  const mode = getSelectedTimesTableMode();
+  state.timesTable.challengeMode = mode;
+  if (dom.timesTableTableWrapper) {
+    dom.timesTableTableWrapper.style.display =
+      mode === "single" ? "flex" : "none";
+  }
+  Array.from(dom.timesTableModeRadios).forEach((radio) => {
+    const label = radio.closest(".radio-option");
+    if (!label) return;
+    if (radio.checked) {
+      label.classList.add("selected");
+    } else {
+      label.classList.remove("selected");
+    }
+  });
+}
+
+function getSelectedTimesTableMode() {
+  const selected = Array.from(dom.timesTableModeRadios).find(
+    (radio) => radio.checked
+  );
+  return selected ? selected.value : "single";
+}
+
+function showTimesTableSetup() {
+  stopTimesTableTimer();
+  state.timesTable.active = false;
+  dom.timesTableFeedback.textContent = "";
+  dom.timesTableFeedback.className = "feedback";
+  dom.timesTableInput.value = "";
+
+  dom.timesTableSetup.classList.remove("hidden");
+  dom.timesTableSession.classList.add("hidden");
+  dom.timesTableSummary.classList.add("hidden");
+
+  dom.timerValue.textContent = "01:00";
+  dom.scoreValue.textContent = "0";
+  dom.timesTableTimer.textContent = "01:00";
+  dom.timesTableCorrect.textContent = "0";
+  dom.timesTableAttempted.textContent = "0";
+}
+
+function startTimesTableChallenge() {
+  const mode = getSelectedTimesTableMode();
+  const selectedTable = parseInt(dom.timesTableTableSelect.value, 10) || 2;
+
+  state.mode = "timesTable";
+  state.timesTable.challengeMode = mode;
+  state.timesTable.selectedTable = selectedTable;
+  state.timesTable.totalAttempted = 0;
+  state.timesTable.correct = 0;
+  state.timesTable.active = true;
+
+  dom.timesTableSetup.classList.add("hidden");
+  dom.timesTableSession.classList.remove("hidden");
+  dom.timesTableSummary.classList.add("hidden");
+  dom.timesTableFeedback.textContent = "";
+  dom.timesTableFeedback.className = "feedback";
+  dom.timesTableInput.value = "";
+
+  dom.timesTableCorrect.textContent = "0";
+  dom.timesTableAttempted.textContent = "0";
+  dom.scoreValue.textContent = "0";
+
+  state.timesTable.timeRemaining = 60;
+  updateTimesTableTimerDisplay();
+  startTimesTableTimer();
+  nextTimesTableQuestion();
+}
+
+function startTimesTableTimer() {
+  stopTimesTableTimer();
+  state.timesTable.timerInterval = setInterval(() => {
+    state.timesTable.timeRemaining -= 1;
+    updateTimesTableTimerDisplay();
+    if (state.timesTable.timeRemaining <= 0) {
+      finishTimesTableChallenge("time");
+    }
+  }, 1000);
+}
+
+function stopTimesTableTimer() {
+  if (state.timesTable.timerInterval) {
+    clearInterval(state.timesTable.timerInterval);
+    state.timesTable.timerInterval = null;
+  }
+}
+
+function updateTimesTableTimerDisplay() {
+  const remaining = Math.max(0, state.timesTable.timeRemaining);
+  const minutes = Math.floor(remaining / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (remaining % 60).toString().padStart(2, "0");
+  const formatted = `${minutes}:${seconds}`;
+  dom.timesTableTimer.textContent = formatted;
+  dom.timerValue.textContent = formatted;
+}
+
+function nextTimesTableQuestion() {
+  if (!state.timesTable.active) return;
+  state.timesTable.currentQuestion = createTimesTableQuestion();
+  dom.timesTableQuestion.textContent = state.timesTable.currentQuestion.prompt;
+  dom.timesTableInput.value = "";
+  dom.timesTableInput.focus();
+}
+
+function createTimesTableQuestion() {
+  const mode = state.timesTable.challengeMode;
+  const randomFactor = () => randomInt(2, 12);
+  const otherFactor = () => randomInt(1, 12);
+
+  if (mode === "single") {
+    const base = state.timesTable.selectedTable;
+    const factor = otherFactor();
+    return {
+      prompt: `${base} × ${factor}`,
+      answer: base * factor
+    };
+  }
+
+  const factorA = randomFactor();
+  const factorB = otherFactor();
+
+  if (mode === "mixed-div") {
+    const useDivision = Math.random() < 0.5;
+    if (useDivision) {
+      const product = factorA * factorB;
+      return {
+        prompt: `${product} ÷ ${factorA}`,
+        answer: factorB
+      };
+    }
+  }
+
+  return {
+    prompt: `${factorA} × ${factorB}`,
+    answer: factorA * factorB
+  };
+}
+
+function submitTimesTableAnswer() {
+  if (!state.timesTable.active || !state.timesTable.currentQuestion) return;
+  const raw = dom.timesTableInput.value.trim();
+  if (!raw) {
+    dom.timesTableFeedback.textContent = "Enter an answer to keep the streak going.";
+    dom.timesTableFeedback.className = "feedback error";
+    return;
+  }
+
+  const value = parseInt(raw, 10);
+  if (Number.isNaN(value)) {
+    dom.timesTableFeedback.textContent = "Use digits only (e.g., 42).";
+    dom.timesTableFeedback.className = "feedback error";
+    dom.timesTableInput.select();
+    return;
+  }
+
+  state.timesTable.totalAttempted += 1;
+  dom.timesTableAttempted.textContent = `${state.timesTable.totalAttempted}`;
+
+  if (value === state.timesTable.currentQuestion.answer) {
+    state.timesTable.correct += 1;
+    dom.timesTableCorrect.textContent = `${state.timesTable.correct}`;
+    dom.scoreValue.textContent = `${state.timesTable.correct}`;
+    dom.timesTableFeedback.textContent = "Great job!";
+    dom.timesTableFeedback.className = "feedback success";
+    dom.timesTableInput.value = "";
+    nextTimesTableQuestion();
+  } else {
+    dom.timesTableFeedback.textContent = "Not quite. Try that one again.";
+    dom.timesTableFeedback.className = "feedback error";
+    dom.timesTableInput.select();
+  }
+}
+
+function handleTimesTableKeypadClick(event) {
+  const button = event.target.closest(".key");
+  if (!button || !dom.timesTableInput) return;
+  const { key, action } = button.dataset;
+
+  if (action === "delete") {
+    dom.timesTableInput.value = dom.timesTableInput.value.slice(0, -1);
+    dom.timesTableInput.focus();
+    dom.timesTableFeedback.textContent = "";
+    dom.timesTableFeedback.className = "feedback";
+    return;
+  }
+
+  if (action === "submit") {
+    submitTimesTableAnswer();
+    return;
+  }
+
+  if (key !== undefined) {
+    if (dom.timesTableInput.value.length >= 3) {
+      dom.timesTableInput.focus();
+      return;
+    }
+    dom.timesTableInput.value += key;
+    dom.timesTableInput.focus();
+    dom.timesTableFeedback.textContent = "";
+    dom.timesTableFeedback.className = "feedback";
+  }
+}
+
+function finishTimesTableChallenge(reason) {
+  if (!state.timesTable.active) {
+    stopTimesTableTimer();
+    return;
+  }
+
+  stopTimesTableTimer();
+  state.timesTable.active = false;
+  state.timesTable.currentQuestion = null;
+
+  dom.timesTableSession.classList.add("hidden");
+  dom.timesTableSummary.classList.remove("hidden");
+
+  const solved = state.timesTable.correct;
+  const attempted = state.timesTable.totalAttempted;
+  const accuracy = attempted === 0 ? 0 : Math.round((solved / attempted) * 100);
+  const finalTime = formatTime(Math.max(0, state.timesTable.timeRemaining));
+
+  dom.timesTableSolved.textContent = `${solved}`;
+  dom.timesTableTotal.textContent = `${attempted}`;
+  dom.timesTableAccuracy.textContent = `${accuracy}%`;
+  dom.timesTableTimer.textContent = finalTime;
+  dom.timerValue.textContent = finalTime;
+  dom.scoreValue.textContent = `${solved}`;
+
+  let message = "Fantastic focus—keep building that fact power.";
+  if (attempted === 0) {
+    message = "Let's give it another go and log some answers.";
+  } else if (solved === 0) {
+    message = "Start with a steady pace—accuracy will climb quickly.";
+  } else if (solved >= 30) {
+    message = "⭐ Lightning fast! You're a times table star.";
+  } else if (solved >= 20) {
+    message = "Great pace! See if you can beat this next round.";
+  } else if (attempted > solved) {
+    message = "Keep practising—accuracy improves with each run.";
+  }
+
+  if (reason === "manual") {
+    message = `${message} (Challenge ended early.)`;
+  }
+
+  dom.timesTableSummaryMessage.textContent = message;
+}
+
+function resetTimesTableState() {
+  stopTimesTableTimer();
+  state.timesTable.active = false;
+  state.timesTable.totalAttempted = 0;
+  state.timesTable.correct = 0;
+  if (dom.timesTableArea) {
+    dom.timesTableSession.classList.add("hidden");
+    dom.timesTableSummary.classList.add("hidden");
+    dom.timesTableSetup.classList.remove("hidden");
+  }
+  dom.timesTableFeedback.className = "feedback";
+  dom.timesTableFeedback.textContent = "";
+  state.timesTable.currentQuestion = null;
+  dom.timerValue.textContent = "00:00";
+  dom.scoreValue.textContent = "0";
+  state.mode = "idle";
+}
+
 function finishSession() {
   stopTimer();
   const elapsedSeconds = Math.floor((Date.now() - state.sessionStart) / 1000);
@@ -1166,9 +1627,13 @@ function finishSession() {
 
 function resetToTopicList() {
   resetSessionState();
+  resetTimesTableState();
   dom.sessionSummary.classList.add("hidden");
   dom.topicIntro.classList.add("hidden");
   dom.practiceArea.classList.add("hidden");
+  if (dom.timesTableArea) {
+    dom.timesTableArea.classList.add("hidden");
+  }
   clearActiveTopic();
 }
 
@@ -1197,6 +1662,7 @@ function resetSessionState() {
   if (dom.noteInput) {
     dom.noteInput.value = "";
   }
+  state.mode = "idle";
 }
 
 function updateScoreDisplay() {

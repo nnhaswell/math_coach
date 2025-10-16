@@ -148,9 +148,25 @@
             <p id="times-table-question" class="times-table-question"></p>
             <div class="times-table-answer">
               <label for="times-table-input" class="sr-only">Enter your answer</label>
-              <input id="times-table-input" autocomplete="off" inputmode="numeric" />
+              <div class="times-table-entry">
+                <input id="times-table-input" autocomplete="off" inputmode="numeric" />
+                <div id="times-table-keypad" class="times-table-keypad">
+                  <button type="button" class="key" data-key="7">7</button>
+                  <button type="button" class="key" data-key="8">8</button>
+                  <button type="button" class="key" data-key="9">9</button>
+                  <button type="button" class="key" data-key="4">4</button>
+                  <button type="button" class="key" data-key="5">5</button>
+                  <button type="button" class="key" data-key="6">6</button>
+                  <button type="button" class="key" data-key="1">1</button>
+                  <button type="button" class="key" data-key="2">2</button>
+                  <button type="button" class="key" data-key="3">3</button>
+                  <button type="button" class="key action delete" data-action="delete">Clear</button>
+                  <button type="button" class="key" data-key="0">0</button>
+                  <button type="button" class="key action submit" data-action="submit">Go</button>
+                </div>
+              </div>
               <div class="times-table-actions">
-                <button id="times-table-submit" class="primary">Submit</button>
+                <button id="times-table-submit" class="primary" type="button">Submit</button>
                 <button id="times-table-end" class="ghost" type="button">End early</button>
               </div>
             </div>
