@@ -821,6 +821,7 @@ const dom = {
   practiceArea: document.getElementById("practice-area"),
   sessionSummary: document.getElementById("session-summary"),
   questionText: document.getElementById("question-text"),
+  difficultyButton: document.getElementById("difficulty-button"),
   answerField: document.getElementById("answer-field"),
   questionCount: document.getElementById("question-count"),
   hintCount: document.getElementById("hint-count"),
@@ -870,6 +871,7 @@ const state = {
   currentTopic: null,
   questionIndex: 0,
   question: null,
+  difficultyLevel: 0,
   score: 0,
   totalHintsUsed: 0,
   hintsUsedThisQuestion: 0,
@@ -894,6 +896,7 @@ function init() {
   renderTopics();
   attachEvents();
   configureTimesTable();
+  updateDifficultyButton();
 }
 
 function attachEvents() {
@@ -911,6 +914,9 @@ function attachEvents() {
       checkAnswer();
     }
   });
+  if (dom.difficultyButton) {
+    dom.difficultyButton.addEventListener("click", increaseDifficulty);
+  }
 }
 
 function configureTimesTable() {
@@ -956,6 +962,82 @@ function configureTimesTable() {
   }
 
   updateTimesTableModeUI();
+}
+
+function updateDifficultyButton() {
+  if (!dom.difficultyButton) return;
+  const humanLevel = state.difficultyLevel + 1;
+  dom.difficultyButton.textContent = `Difficulty: Level ${humanLevel}`;
+  const canUse =
+    state.mode === "practice" &&
+    state.currentTopic &&
+    state.question &&
+    !state.awaitingNext;
+  dom.difficultyButton.disabled = !canUse;
+}
+
+function increaseDifficulty() {
+  if (
+    !state.currentTopic ||
+    state.mode !== "practice" ||
+    !state.question ||
+    state.awaitingNext
+  ) {
+    return;
+  }
+  state.difficultyLevel += 1;
+  try {
+    state.question = state.currentTopic.generateQuestion(state.difficultyLevel);
+  } catch (error) {
+    console.error("Failed to generate higher-difficulty question:", error);
+    state.difficultyLevel -= 1;
+    updateDifficultyButton();
+    dom.feedback.textContent =
+      "Unable to increase difficulty for this topic right now.";
+    dom.feedback.className = "feedback error";
+    return;
+  }
+  presentCurrentQuestion({
+    message: `Difficulty increased to Level ${state.difficultyLevel + 1}.`
+  });
+}
+
+function presentCurrentQuestion({ message = "" } = {}) {
+  if (!state.question) return;
+
+  state.questionStart = Date.now();
+  state.hintsUsedThisQuestion = 0;
+  state.awaitingNext = false;
+
+  dom.answerInput.value = "";
+  dom.answerInput.disabled = false;
+  dom.answerInput.classList.remove("hidden");
+  dom.answerField.classList.remove("digit-mode");
+  dom.checkAnswerBtn.disabled = false;
+  dom.nextQuestionBtn.classList.add("hidden");
+  dom.hintButton.disabled = false;
+  dom.hintList.innerHTML = "";
+
+  if (message) {
+    dom.feedback.textContent = message;
+  } else {
+    dom.feedback.textContent = "";
+  }
+  dom.feedback.className = "feedback";
+
+  dom.questionText.innerHTML = renderQuestionLayout(
+    state.question.layout,
+    state.question.prompt
+  );
+  dom.answerInstruction.textContent = state.question.instruction;
+  dom.questionCount.textContent = `${state.questionIndex + 1} / 5`;
+
+  if (dom.noteInput) {
+    dom.noteInput.value = "";
+  }
+
+  updateDifficultyButton();
+  setupPlaceValueInputs();
 }
 
 function renderTopics() {
@@ -1076,6 +1158,7 @@ function selectTopic(topicId) {
   resetSessionState();
   state.mode = "practice";
   populateTopicIntro(topic);
+  updateDifficultyButton();
 
   dom.topicIntro.classList.remove("hidden");
   dom.practiceArea.classList.add("hidden");
@@ -1111,6 +1194,7 @@ function startPractice() {
   state.questionIndex = 0;
   state.score = 0;
   state.totalHintsUsed = 0;
+  state.difficultyLevel = 0;
   updateScoreDisplay();
   dom.hintCount.textContent = "0";
   dom.questionCount.textContent = "1 / 5";
@@ -1121,6 +1205,8 @@ function startPractice() {
   dom.sessionSummary.classList.add("hidden");
   dom.answerInput.value = "";
   dom.answerInput.focus();
+  dom.nextQuestionBtn.classList.add("hidden");
+  updateDifficultyButton();
 
   startTimer();
   nextQuestion();
@@ -1147,33 +1233,14 @@ function updateTimer() {
 }
 
 function nextQuestion() {
+  if (!state.currentTopic) return;
   if (state.questionIndex >= 5) {
     finishSession();
     return;
   }
 
-  state.question = state.currentTopic.generateQuestion();
-  state.questionStart = Date.now();
-  state.hintsUsedThisQuestion = 0;
-  state.awaitingNext = false;
-  dom.answerInput.value = "";
-  dom.answerInput.disabled = false;
-  dom.answerInput.classList.remove("hidden");
-  dom.checkAnswerBtn.disabled = false;
-  dom.feedback.textContent = "";
-  dom.feedback.className = "feedback";
-  dom.hintList.innerHTML = "";
-  dom.hintButton.disabled = false;
-  dom.questionText.innerHTML = renderQuestionLayout(
-    state.question.layout,
-    state.question.prompt
-  );
-  dom.answerInstruction.textContent = state.question.instruction;
-  dom.questionCount.textContent = `${state.questionIndex + 1} / 5`;
-  if (dom.noteInput) {
-    dom.noteInput.value = "";
-  }
-  setupPlaceValueInputs();
+  state.question = state.currentTopic.generateQuestion(state.difficultyLevel);
+  presentCurrentQuestion();
 }
 
 function setupPlaceValueInputs() {
@@ -1237,6 +1304,7 @@ function checkAnswer() {
     dom.nextQuestionBtn.classList.remove("hidden");
     dom.answerInput.disabled = true;
     dom.hintButton.disabled = true;
+    updateDifficultyButton();
   } else {
     dom.feedback.textContent = "Not quite yet. Revisit your work and try another hint if needed.";
     dom.feedback.className = "feedback error";
@@ -1611,11 +1679,16 @@ function resetTimesTableState() {
   state.timesTable.currentQuestion = null;
   dom.timerValue.textContent = "00:00";
   dom.scoreValue.textContent = "0";
+  state.question = null;
+  state.difficultyLevel = 0;
   state.mode = "idle";
+  updateDifficultyButton();
 }
 
 function finishSession() {
   stopTimer();
+  state.mode = "summary";
+  state.question = null;
   const elapsedSeconds = Math.floor((Date.now() - state.sessionStart) / 1000);
   dom.practiceArea.classList.add("hidden");
   dom.sessionSummary.classList.remove("hidden");
@@ -1623,6 +1696,7 @@ function finishSession() {
   dom.summaryTime.textContent = formatTime(elapsedSeconds);
   dom.summaryHints.textContent = `${state.totalHintsUsed}`;
   dom.summaryScore.textContent = `${state.score}`;
+  updateDifficultyButton();
 }
 
 function resetToTopicList() {
@@ -1641,6 +1715,7 @@ function resetSessionState() {
   stopTimer();
   state.questionIndex = 0;
   state.question = null;
+  state.difficultyLevel = 0;
   state.score = 0;
   state.totalHintsUsed = 0;
   state.hintsUsedThisQuestion = 0;
@@ -1663,6 +1738,7 @@ function resetSessionState() {
     dom.noteInput.value = "";
   }
   state.mode = "idle";
+  updateDifficultyButton();
 }
 
 function updateScoreDisplay() {
@@ -2020,8 +2096,44 @@ function gcd(a, b) {
   return b === 0 ? a : gcd(b, a % b);
 }
 
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function randomInt(min, max, options = {}) {
+  if (min === undefined || max === undefined) return NaN;
+  const lower = Math.ceil(Math.min(min, max));
+  const upper = Math.floor(Math.max(min, max));
+  const span = upper - lower + 1;
+  if (!Number.isFinite(lower) || !Number.isFinite(upper) || span <= 0) {
+    return lower;
+  }
+
+  const baseLevel =
+    typeof options.difficultyLevel === "number"
+      ? options.difficultyLevel
+      : state && typeof state.difficultyLevel === "number"
+        ? state.difficultyLevel
+        : 0;
+  const difficultyLevel = Math.max(0, baseLevel);
+
+  const requestedBias = options.bias ?? null;
+  const bias =
+    requestedBias && requestedBias !== "auto"
+      ? requestedBias
+      : difficultyLevel > 0
+        ? "high"
+        : "none";
+
+  const strength = 1 + difficultyLevel * 0.6;
+  const baseRandom = Math.random();
+  let ratio = baseRandom;
+
+  if (bias === "high" && difficultyLevel > 0) {
+    ratio = 1 - Math.pow(1 - baseRandom, strength);
+  } else if (bias === "low" && difficultyLevel > 0) {
+    ratio = Math.pow(baseRandom, strength);
+  }
+
+  const clampedRatio = Math.min(Math.max(ratio, 0), 0.999999999);
+  const value = lower + Math.floor(clampedRatio * span);
+  return Math.min(upper, Math.max(lower, value));
 }
 
 function threeDigits(num) {

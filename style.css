@@ -328,6 +328,26 @@ body {
   gap: 1rem;
 }
 
+.question-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.question-header .question-text {
+  flex: 1;
+}
+
+#difficulty-button {
+  white-space: nowrap;
+  align-self: flex-start;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  margin-left: auto;
+}
+
 .question-text {
   min-height: 120px;
   display: flex;
